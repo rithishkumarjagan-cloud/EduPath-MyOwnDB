@@ -6,14 +6,22 @@ const bcrypt = require("bcrypt");
 const XLSX = require("xlsx");
 
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
+const ADMIN_KEY = process.env.ADMIN_KEY || "change-me-123";
 
 app.use(cors());
+
+function requireAdmin(req, res, next) {
+    const key = req.headers["x-admin-key"] || req.query.key;
+    if (key !== ADMIN_KEY) return res.status(403).json({ message: "Admin only." });
+    next();
+}
 app.use(express.json());
 
-const DB_DIR = path.join(__dirname, "database");
+const DATA_ROOT = process.env.DATA_DIR || __dirname;
+const DB_DIR = path.join(DATA_ROOT, "database");
 const DB = path.join(DB_DIR, "users.json");
-const EXPORT_DIR = path.join(__dirname, "exports");
+const EXPORT_DIR = path.join(DATA_ROOT, "exports");
 const EXPORT_FILE = path.join(EXPORT_DIR, "EduPath_Users.xlsx");
 
 function getUsers() {
@@ -148,13 +156,13 @@ app.post("/login", async (req, res) => {
 });
 
 // Admin/user list
-app.get("/users", (req, res) => {
+app.get("/users", requireAdmin, (req, res) => {
     const users = getUsers();
     res.json(users.map(safeUser));
 });
 
 // Export all users to an Excel workbook
-app.get("/export-excel", (req, res) => {
+app.get("/export-excel", requireAdmin, (req, res) => {
     try {
         const users = getUsers();
 
@@ -195,7 +203,7 @@ app.get("/export-excel", (req, res) => {
 });
 
 // Optional API to get summary statistics for the admin application
-app.get("/stats", (req, res) => {
+app.get("/stats", requireAdmin, (req, res) => {
     const users = getUsers();
     const roleCounts = {};
     const courseCounts = {};
